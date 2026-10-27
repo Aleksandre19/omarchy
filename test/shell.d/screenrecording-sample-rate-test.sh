@@ -45,3 +45,14 @@ later=$(loudness "$recording" 25)
 awk -v s="$start" -v l="$later" 'BEGIN { exit !(s - l > -1 && s - l < 1 && l > -15 && l < -13) }' ||
   fail "speech after a silent start is at full level right away" "$start LUFS at 11 s, $later LUFS at 25 s"
 pass "speech after a silent start is at full level right away"
+
+# A clip shorter than 3 s has no 3 s loudness reading, so it kept its raw level unless the
+# gain falls back to the 400 ms readings.
+recording="$work/short.mp4"
+ffmpeg -loglevel error -f lavfi -i testsrc=size=64x64:rate=30 -f lavfi -i "aevalsrc='0.005*sin(2*PI*300*t)':s=48000" \
+  -t 2 -c:v libx264 -c:a aac -ar 48000 "$recording"
+echo "$recording" >"$RECORDING_FILE"
+finalize_recording
+level=$(loudness "$recording" 0.5)
+awk -v l="$level" 'BEGIN { exit !(l > -15 && l < -13) }' || fail "a short clip is brought to -14 LUFS too" "$level LUFS"
+pass "a short clip is brought to -14 LUFS too"
